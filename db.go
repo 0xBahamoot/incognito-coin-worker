@@ -269,7 +269,6 @@ func DBUpdateCoinV1PubkeyInfo(list map[string]map[string]CoinInfo) error {
 				keyInfo.CoinV1StartIndex[token] = info
 			}
 		}
-
 		if ok {
 			delete(list, keyInfo.Pubkey)
 		}
