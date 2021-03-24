@@ -10,7 +10,8 @@ const (
 const (
 	version                      = "0.9.2"
 	DefaultAPIPort               = 9001
-	DefaultMongoAddress          = "mongodb://root:example@51.161.119.66:27017"
+	DefaultMongoAddress          = ""
+	DefaultMongoDB               = "coins"
 	DefaultMaxConcurrentOTACheck = 10
 	DefaultChainFolder           = "chain"
 	DefaultFullnode              = "http://51.161.119.66:9334"
