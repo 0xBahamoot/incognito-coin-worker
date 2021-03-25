@@ -24,6 +24,7 @@ func startAPIService() {
 	http.HandleFunc("/submitotakey", submitOTAkeyHandler)
 	http.HandleFunc("/getcoins", getCoinsHandler)
 	http.HandleFunc("/checkkeyimages", checkKeyImagesHandler)
+	http.HandleFunc("/checkkeyimagesb58", checkKeyImagesB58Handler)
 	http.HandleFunc("/getrandomcommitments", getRandomCommitmentsHandler)
 	http.HandleFunc("/getkeyinfo", getKeyInfoHandler)
 	http.HandleFunc("/getcoinspending", getCoinsPendingHandler)
@@ -248,7 +249,58 @@ func checkKeyImagesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := DBCheckKeyimagesUsed(req.Keyimages, req.ShardID)
+	result, err := DBCheckKeyimagesUsed(req.Keyimages, req.ShardID, false)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, err = w.Write(buildErrorRespond(err))
+		if err != nil {
+			log.Println(err)
+		}
+		return
+	}
+	w.WriteHeader(200)
+	respond := API_respond{
+		Result: result,
+		Error:  nil,
+	}
+	respondBytes, err := json.Marshal(respond)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, err = w.Write(buildErrorRespond(err))
+		if err != nil {
+			log.Println(err)
+		}
+		return
+	}
+	_, err = w.Write(respondBytes)
+	if err != nil {
+		log.Println(err)
+	}
+	return
+}
+
+func checkKeyImagesB58Handler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if r.Method != "POST" {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		_, err := w.Write(buildErrorRespond(errors.New("Method not allowed")))
+		if err != nil {
+			log.Println(err)
+		}
+		return
+	}
+	var req API_check_keyimages_request
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		_, err = w.Write(buildErrorRespond(err))
+		if err != nil {
+			log.Println(err)
+		}
+		return
+	}
+
+	result, err := DBCheckKeyimagesUsed(req.Keyimages, req.ShardID, true)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, err = w.Write(buildErrorRespond(err))

@@ -216,14 +216,18 @@ func DBSaveUsedKeyimage(list []KeyImageData) error {
 	return nil
 }
 
-func DBCheckKeyimagesUsed(list []string, shardID int) ([]bool, error) {
+func DBCheckKeyimagesUsed(list []string, shardID int, isBase58 bool) ([]bool, error) {
 	startTime := time.Now()
 	var result []bool
 	var listToCheck []string
 	var kmsdata []KeyImageData
-	for _, v := range list {
-		a, _ := base64.StdEncoding.DecodeString(v)
-		listToCheck = append(listToCheck, base58.EncodeCheck(a))
+	if !isBase58 {
+		for _, v := range list {
+			a, _ := base64.StdEncoding.DecodeString(v)
+			listToCheck = append(listToCheck, base58.EncodeCheck(a))
+		}
+	} else {
+		listToCheck = list
 	}
 	ctx, _ := context.WithTimeout(context.Background(), time.Duration(len(listToCheck)+1)*DB_OPERATION_TIMEOUT)
 	filter := bson.M{"keyimage": bson.M{operator.In: listToCheck}}
@@ -269,6 +273,9 @@ func DBUpdateCoinV1PubkeyInfo(list map[string]map[string]CoinInfo) error {
 				keyInfo.CoinV1StartIndex[token] = idx
 			} else {
 				info := keyInfo.CoinV1StartIndex[token]
+				if info.Start > idx.Start {
+					info.Start = idx.Start
+				}
 				info.End = idx.End
 				info.Total = info.Total + idx.Total
 				keyInfo.CoinV1StartIndex[token] = info
