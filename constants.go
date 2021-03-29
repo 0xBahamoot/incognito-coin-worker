@@ -14,8 +14,10 @@ const (
 	DefaultMongoDB               = "coins"
 	DefaultMaxConcurrentOTACheck = 10
 	DefaultChainFolder           = "chain"
-	DefaultFullnode              = "http://51.161.119.66:9334"
+	DefaultFullnode              = ""
 	DefaultMode                  = TESTMODE
+	DefaultNetwork               = "testnet2"
+	DefaultHighway               = "74.207.247.250:9330"
 	CHAINSYNCMODE                = "chainsync"
 	INDEXERMODE                  = "indexer"
 	QUERYMODE                    = "query"

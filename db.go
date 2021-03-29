@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/x/bsonx"
 )
 
 func connectDB() error {
@@ -29,14 +30,19 @@ func connectDB() error {
 func DBCreateCoinV1Index() error {
 	startTime := time.Now()
 	ctx, _ := context.WithTimeout(context.Background(), time.Duration(5)*DB_OPERATION_TIMEOUT)
-	indexName, err := mgm.Coll(&CoinDataV1{}).Indexes().CreateOne(ctx, mongo.IndexModel{
-		Keys: bson.M{
-			"coinpubkey": 1,
-			"tokenid":    1,
-			"coinidx":    1,
+	coinMdl := []mongo.IndexModel{
+		{
+			Keys: bsonx.Doc{{Key: "coinpubkey", Value: bsonx.Int32(1)}, {Key: "tokenid", Value: bsonx.Int32(1)}, {Key: "coinidx", Value: bsonx.Int32(1)}},
 		},
-		// Options: options.Index().SetUnique(true),
-	})
+		{
+			Keys: bsonx.Doc{{Key: "shardid", Value: bsonx.Int32(1)}, {Key: "tokenid", Value: bsonx.Int32(1)}, {Key: "coinidx", Value: bsonx.Int32(1)}},
+		},
+		{
+			Keys:    bsonx.Doc{{Key: "coin", Value: bsonx.Int32(1)}},
+			Options: options.Index().SetUnique(true),
+		},
+	}
+	indexName, err := mgm.Coll(&CoinDataV1{}).Indexes().CreateMany(ctx, coinMdl)
 	if err != nil {
 		log.Printf("failed to indexs coins in %v", time.Since(startTime))
 		return err
@@ -47,7 +53,25 @@ func DBCreateCoinV1Index() error {
 }
 
 func DBCreateCoinV2Index() error {
+	return nil
+}
 
+func DBCreateKeyimageIndex() error {
+	startTime := time.Now()
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(5)*DB_OPERATION_TIMEOUT)
+	imageMdl := []mongo.IndexModel{
+		{
+			Keys:    bsonx.Doc{{Key: "keyimage", Value: bsonx.Int32(1)}},
+			Options: options.Index().SetUnique(true),
+		},
+	}
+	indexName, err := mgm.Coll(&KeyImageData{}).Indexes().CreateMany(ctx, imageMdl)
+	if err != nil {
+		log.Printf("failed to indexs coins in %v", time.Since(startTime))
+		return err
+	}
+	log.Println("indexName", indexName)
+	log.Printf("success indexs keyimages in %v", time.Since(startTime))
 	return nil
 }
 
@@ -70,7 +94,6 @@ func DBSaveCoins(list []CoinData) error {
 			return err
 		}
 		log.Printf("inserted %v v2coins in %v", len(docs), time.Since(startTime))
-
 	}
 	if len(docsV1) > 0 {
 		_, err := mgm.Coll(&CoinDataV1{}).InsertMany(ctx, docsV1)
@@ -185,7 +208,8 @@ func DBGetCoinV1ByPubkey(tokenID, pubkey string, offset int64, limit int64) ([]C
 	}
 	list := []CoinData{}
 	filter := bson.M{"coinpubkey": bson.M{operator.Eq: pubkey}, "tokenid": bson.M{operator.Eq: tokenID}}
-	err := mgm.Coll(&CoinDataV1{}).SimpleFind(&list, filter, &options.FindOptions{
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(limit)*DB_OPERATION_TIMEOUT)
+	err := mgm.Coll(&CoinDataV1{}).SimpleFindWithCtx(ctx, &list, filter, &options.FindOptions{
 		Skip:  &offset,
 		Limit: &limit,
 	})
@@ -221,13 +245,9 @@ func DBCheckKeyimagesUsed(list []string, shardID int, isBase58 bool) ([]bool, er
 	var result []bool
 	var listToCheck []string
 	var kmsdata []KeyImageData
-	if !isBase58 {
-		for _, v := range list {
-			a, _ := base64.StdEncoding.DecodeString(v)
-			listToCheck = append(listToCheck, base58.EncodeCheck(a))
-		}
-	} else {
-		listToCheck = list
+	for _, v := range list {
+		a, _ := base64.StdEncoding.DecodeString(v)
+		listToCheck = append(listToCheck, base58.EncodeCheck(a))
 	}
 	ctx, _ := context.WithTimeout(context.Background(), time.Duration(len(listToCheck)+1)*DB_OPERATION_TIMEOUT)
 	filter := bson.M{"keyimage": bson.M{operator.In: listToCheck}}
@@ -256,7 +276,7 @@ func DBUpdateCoinV1PubkeyInfo(list map[string]map[string]CoinInfo) error {
 	for pubkey, _ := range list {
 		pubkeys = append(pubkeys, pubkey)
 	}
-	ctx, _ := context.WithTimeout(context.Background(), time.Duration(len(list))*DB_OPERATION_TIMEOUT)
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(len(list)+1)*DB_OPERATION_TIMEOUT)
 	KeyInfoDatas := []KeyInfoData{}
 	filter := bson.M{"pubkey": bson.M{operator.In: pubkeys}}
 	err := mgm.Coll(&KeyInfoData{}).SimpleFindWithCtx(ctx, &KeyInfoDatas, filter)
@@ -292,7 +312,7 @@ func DBUpdateCoinV1PubkeyInfo(list map[string]map[string]CoinInfo) error {
 		keysToInsert = append(keysToInsert, *newKeyInfo)
 	}
 	if len(keysToInsert) > 0 {
-		ctx, _ = context.WithTimeout(context.Background(), time.Duration(len(keysToInsert))*DB_OPERATION_TIMEOUT)
+		ctx, _ := context.WithTimeout(context.Background(), time.Duration(len(keysToInsert)+10)*DB_OPERATION_TIMEOUT)
 		docs := []interface{}{}
 		for _, key := range keysToInsert {
 			docs = append(docs, key)
@@ -303,7 +323,6 @@ func DBUpdateCoinV1PubkeyInfo(list map[string]map[string]CoinInfo) error {
 		}
 	}
 	if len(keysToUpdate) > 0 {
-		ctx, _ := context.WithTimeout(context.Background(), time.Duration(len(keysToUpdate))*DB_OPERATION_TIMEOUT)
 		docs := []interface{}{}
 		for _, key := range keysToUpdate {
 			update := bson.M{
@@ -312,6 +331,7 @@ func DBUpdateCoinV1PubkeyInfo(list map[string]map[string]CoinInfo) error {
 			docs = append(docs, update)
 		}
 		for idx, doc := range docs {
+			ctx, _ := context.WithTimeout(context.Background(), time.Duration(5)*DB_OPERATION_TIMEOUT)
 			_, err := mgm.Coll(&KeyInfoData{}).UpdateByID(ctx, keysToUpdate[idx].GetID(), doc)
 			if err != nil {
 				return err
@@ -392,5 +412,18 @@ func DBGetPendingCoins() ([]string, error) {
 		result = append(result, v.SerialNumber...)
 	}
 	return result, nil
+}
 
+func DBGetCoinV1ByIndexes(indexes []uint64, shardID int, tokenID string) ([]CoinDataV1, error) {
+	startTime := time.Now()
+	var result []CoinDataV1
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(len(indexes)+1)*DB_OPERATION_TIMEOUT)
+	filter := bson.M{"coinidx": bson.M{operator.In: indexes}, "shardid": bson.M{operator.Eq: shardID}, "tokenid": bson.M{operator.Eq: tokenID}}
+	err := mgm.Coll(&CoinDataV1{}).SimpleFindWithCtx(ctx, &result, filter)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	log.Printf("found %v coinV1 in %v", len(result), time.Since(startTime))
+	return result, nil
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"io/ioutil"
 	"log"
@@ -9,6 +8,7 @@ import (
 
 var ENABLE_PROFILER bool
 var serviceCfg Config
+var RESET_FLAG bool
 
 type Config struct {
 	APIPort               int    `json:"apiport"`
@@ -18,6 +18,8 @@ type Config struct {
 	Mode                  string `json:"mode"`
 	MongoAddress          string `json:"mongo"`
 	MongoDB               string `json:"mongodb"`
+	ChainNetwork          string `json:"chainnetwork"`
+	Highway               string `json:"highway"`
 }
 
 func init() {
@@ -28,6 +30,8 @@ func init() {
 	serviceCfg.Mode = DefaultMode
 	serviceCfg.MongoAddress = DefaultMongoAddress
 	serviceCfg.MongoDB = DefaultMongoDB
+	serviceCfg.ChainNetwork = DefaultNetwork
+	serviceCfg.Highway = DefaultHighway
 }
 
 func readConfigAndArg() {
@@ -52,7 +56,10 @@ func readConfigAndArg() {
 	argMaxConcurrentOTACheck := flag.Int("maxotacheck", DefaultMaxConcurrentOTACheck, "set MaxConcurrentOTACheck")
 	argChain := flag.String("chain", DefaultChainFolder, "set chain folder")
 	argDBName := flag.String("dbname", DefaultChainFolder, "set mongodb name")
+	argNetwork := flag.String("network", DefaultChainFolder, "set chainetwork name")
+	argHighway := flag.String("highway", DefaultChainFolder, "set highway name")
 	argProfiler := flag.Bool("profiler", false, "set profiler")
+	argResetDB := flag.Bool("resetdb", false, "reset mongodb and resync")
 	flag.Parse()
 	if tempCfg.APIPort == 0 {
 		tempCfg.APIPort = *argPort
@@ -75,10 +82,17 @@ func readConfigAndArg() {
 	if tempCfg.MongoDB == "" {
 		tempCfg.MongoDB = *argDBName
 	}
+	if tempCfg.ChainNetwork == "" {
+		tempCfg.ChainNetwork = *argNetwork
+	}
+	if tempCfg.Highway == "" {
+		tempCfg.Highway = *argHighway
+	}
+	RESET_FLAG = *argResetDB
 	ENABLE_PROFILER = *argProfiler
 	serviceCfg = tempCfg
 
-	if serviceCfg.MongoAddress == "" || serviceCfg.FullnodeAddress == "" || serviceCfg.MongoDB == "" {
-		log.Fatalln("MongoAddress & FullnodeAddress & MongoDB can't be empty")
+	if serviceCfg.MongoAddress == "" || serviceCfg.FullnodeAddress == "" || serviceCfg.MongoDB == "" || serviceCfg.ChainNetwork == "" || serviceCfg.Highway == "" {
+		log.Fatalln("MongoAddress & FullnodeAddress & MongoDB & ChainNetwork & Highway can't be empty")
 	}
 }
