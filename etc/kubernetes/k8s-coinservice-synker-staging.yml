@@ -7,14 +7,14 @@ spec:
     matchLabels:
       run: coinservice-synker-stg
   replicas: 1
+  strategy:
+    # Force recreate container to prevent data duplication
+    type: Recreate
   template:
     metadata:
       labels:
         run: coinservice-synker-stg
     spec:
-      strategy:
-        # Force recreate container to prevent data duplication
-        type: Recreate
       containers:
         - name: coinservice-synker-stg-container
           image: incognitochain/coin-service:latest
