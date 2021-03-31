@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: coinservice-api-prod-container
-          image: incognito/coin-service:latest
+          image: incognitochain/coin-service:latest
           imagePullPolicy: Never
           ports:
             - containerPort: 9001
